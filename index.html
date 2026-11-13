@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enciclopédia da Flora Amazônica</title>
+<style>
+:root{--green:#174b35;--green2:#28734f;--cream:#f5f7ef;--gold:#e8bd62;--ink:#183329}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--cream);color:var(--ink);line-height:1.55}
+header{background:linear-gradient(120deg,#103b2b,#286a45);color:white;padding:42px 20px;text-align:center}
+header h1{margin:0 0 8px;font-size:clamp(1.8rem,5vw,3rem)}header p{max-width:760px;margin:auto;color:#e3f1e7}
+main{max-width:1050px;margin:28px auto;padding:0 16px}
+.panel{background:white;border-radius:18px;padding:22px;margin:18px 0;box-shadow:0 5px 22px #1234}
+h2{color:var(--green);margin-top:0}.actions{display:flex;gap:10px;flex-wrap:wrap}
+button{border:0;border-radius:10px;padding:12px 18px;background:var(--green2);color:white;font-weight:700;cursor:pointer}
+button.secondary{background:#e7efe8;color:var(--green)}button:disabled{opacity:.5;cursor:not-allowed}
+#webcam-container{display:flex;justify-content:center;margin:16px auto;max-width:100%;overflow:hidden}
+#webcam-container canvas{width:min(100%,420px);height:auto;border-radius:14px}
+.status{padding:10px 12px;background:#eef5ee;border-radius:10px;margin-top:12px}
+.result{border:1px solid #dbe7dc;border-radius:12px;padding:12px;margin:10px 0}
+.bar{height:10px;background:#e6eee7;border-radius:99px;overflow:hidden;margin-top:7px}.bar span{display:block;height:100%;background:#31865b;width:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.plant{border:1px solid #e0e9df;border-radius:14px;padding:16px;background:#fbfdf9}
+.plant h3{margin:0 0 6px;color:var(--green)}
+small,.muted{color:#5b7064}
+footer{text-align:center;padding:26px;color:#617267}
+a{color:#1c6847}
+</style>
+</head>
+<body>
+<header>
+<h1>🌿 Enciclopédia da Flora Amazônica</h1>
+<p>Explore plantas importantes da Amazônia e experimente o identificador visual treinado com seu modelo Teachable Machine.</p>
+</header>
+<main>
+<section class="panel">
+<h2>📷 Identificador de plantas</h2>
+<p>Permita o acesso à câmera e mostre uma planta ao identificador. Para melhores resultados, enquadre uma planta por vez, com boa iluminação e fundo simples.</p>
+<div class="actions">
+<button id="start">Ativar câmera</button>
+<button id="stop" class="secondary" disabled>Desligar câmera</button>
+</div>
+<div id="webcam-container"></div>
+<div id="status" class="status" role="status">Carregando o modelo de classificação…</div>
+<div id="predictions" aria-live="polite"></div>
+<p class="muted"><small>O resultado é uma estimativa do modelo treinado, não uma confirmação científica da espécie. Se a planta não estiver entre as categorias treinadas, o modelo ainda poderá sugerir uma categoria conhecida.</small></p>
+</section>
+
+<section class="panel">
+<h2>🌱 Categorias do modelo</h2>
+<p>Este identificador foi treinado com 17 rótulos. Alguns nomes foram normalizados para facilitar a leitura.</p>
+<div id="categories" class="grid"></div>
+</section>
+
+<section class="panel">
+<h2>🌳 Sobre a flora amazônica</h2>
+<p>A flora amazônica reúne uma enorme diversidade de árvores, palmeiras, ervas, trepadeiras e plantas aquáticas. Ela participa do equilíbrio dos ecossistemas, oferece alimento e abrigo para animais e tem importância cultural, ecológica e econômica para muitas comunidades.</p>
+<p><strong>Importante:</strong> as fichas abaixo apresentam informações gerais sobre os nomes reconhecidos pelo modelo. A ocorrência e a origem nativa podem variar conforme a espécie e a região; a identificação definitiva exige avaliação botânica.</p>
+</section>
+</main>
+<footer>Projeto educativo • Enciclopédia da Flora Amazônica</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+<script>
+const MODEL_URL = "./modelo/";
+const details = {
+"samauma":["Samaúma","Árvore de grande porte, conhecida por seu tronco muito desenvolvido e raízes tabulares. Tem papel importante na estrutura da floresta."],
+"vitória régia":["Vitória-régia","Planta aquática de folhas flutuantes muito grandes, associada a ambientes de águas calmas."],
+"castanheira":["Castanheira","Árvore conhecida pelas sementes chamadas castanhas-do-brasil, importantes para a alimentação e para a economia extrativista."],
+"açaí":["Açaí","Palmeira cujos frutos são alimento tradicional em diversas comunidades amazônicas."],
+"buriti":["Buriti","Palmeira associada a áreas úmidas e veredas; seus frutos são utilizados na alimentação e em produtos artesanais."],
+"seringueira":["Seringueira","Árvore produtora de látex, historicamente importante para a região amazônica."],
+"guaraná":["Guaraná","Planta cujas sementes são utilizadas tradicionalmente em bebidas e preparações alimentares."],
+"cupuaçu":["Cupuaçu","Árvore frutífera amazônica; sua polpa é usada em sucos, doces e outras receitas."],
+"cacau":["Cacau","Árvore que produz frutos com sementes usadas na fabricação de chocolate."],
+"camu-camu":["Camu-camu","Frutífera de ambientes alagáveis, conhecida por seus frutos ricos em vitamina C."],
+"andiroba":["Andiroba","Árvore cujas sementes fornecem óleo utilizado tradicionalmente em diferentes preparações."],
+"copaíba":["Copaíba","Árvore conhecida pelo óleo-resina, utilizado tradicionalmente e estudado por suas propriedades."],
+"pau-rosa":["Pau-rosa","Árvore amazônica conhecida pelo óleo aromático; sua exploração exige atenção à conservação."],
+"jambu":["Jambu","Erva culinária muito usada na alimentação regional, conhecida pela sensação de formigamento que provoca na boca."],
+"helicônia":["Helicônia","Grupo de plantas tropicais com inflorescências vistosas, importantes também como fonte de recursos para animais."],
+"mandioca":["Mandioca","Planta de raízes tuberosas fundamental na alimentação de muitas populações brasileiras. O preparo correto é essencial."],
+"patauá":["Patauá","Palmeira amazônica cujos frutos fornecem óleo e alimento, com usos tradicionais."]
+};
+function normalize(s){return (s||"").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").trim().replace(/\\s+/g," ")}
+function niceLabel(s){
+ const n=normalize(s);
+ const aliases={"vitoria regea":"vitória-régia","samauma":"samaúma","guarana":"guaraná","copaiba":"copaíba","heliconia":"helicônia","pataua":"patauá"};
+ return aliases[n] || s.trim();
+}
+let model, webcam, loopId=null;
+const statusEl=document.getElementById("status");
+async function loadModel(){
+ try{
+  if(!window.tmImage){throw new Error("A biblioteca do identificador não carregou. Verifique sua conexão com a internet.");}
+  model=await tmImage.load(MODEL_URL+"model.json",MODEL_URL+"metadata.json");
+  const labels=model.getMetadata().labels;
+  document.getElementById("categories").innerHTML=labels.map(l=>`<article class="plant"><h3>${escapeHtml(niceLabel(l))}</h3><p>${escapeHtml((details[normalize(niceLabel(l))]||["Categoria do modelo","Rótulo incluído no treinamento visual."])[1])}</p></article>`).join("");
+  statusEl.textContent="Modelo carregado! Clique em “Ativar câmera” para começar.";
+ }catch(e){statusEl.textContent="Não foi possível carregar o modelo: "+e.message+" Confira se a pasta modelo contém model.json, metadata.json e weights.bin.";}
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+async function start(){
+ if(!model){statusEl.textContent="O modelo ainda está carregando. Aguarde um instante.";return;}
+ try{
+  webcam=new tmImage.Webcam(320,320,true);
+  await webcam.setup();
+  await webcam.play();
+  document.getElementById("webcam-container").replaceChildren(webcam.canvas);
+  document.getElementById("start").disabled=true;document.getElementById("stop").disabled=false;
+  statusEl.textContent="Câmera ativa. Aponte para uma planta.";
+  loop();
+ }catch(e){statusEl.textContent="Não foi possível abrir a câmera. Autorize o acesso à câmera no navegador e use o endereço HTTPS do GitHub Pages. Detalhe: "+e.message;}
+}
+async function loop(){if(!webcam)return;webcam.update();await predict();loopId=requestAnimationFrame(loop);}
+async function predict(){
+ try{
+  const predictions=await model.predict(webcam.canvas);
+  predictions.sort((a,b)=>b.probability-a.probability);
+  const top=predictions.slice(0,3);
+  document.getElementById("predictions").innerHTML=top.map(p=>{
+   const pct=(p.probability*100).toFixed(1), label=niceLabel(p.className);
+   return `<div class="result"><strong>${escapeHtml(label)}</strong> — ${pct}%<div class="bar"><span style="width:${pct}%"></span></div></div>`;
+  }).join("");
+ }catch(e){statusEl.textContent="Erro ao analisar a imagem: "+e.message;}
+}
+function stop(){
+ if(loopId)cancelAnimationFrame(loopId);loopId=null;
+ if(webcam){webcam.stop();webcam=null;}
+ document.getElementById("webcam-container").innerHTML="";
+ document.getElementById("start").disabled=false;document.getElementById("stop").disabled=true;
+ statusEl.textContent="Câmera desligada.";
+}
+document.getElementById("start").addEventListener("click",start);
+document.getElementById("stop").addEventListener("click",stop);
+loadModel();
+</script>
+</body>
+</html>
